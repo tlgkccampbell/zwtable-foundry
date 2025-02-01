@@ -57,6 +57,22 @@ Hooks.on("combatTurnChange", async function(combat, prior, current) {
     }
 });
 
+
+Hooks.on("updateCombatant", async function(combatant, changed, options, userId) {
+    if (game.user?.isGM) {
+        let combat = combatant.combat;
+        if (combat && combat.current.round == 0 && changed.initiative) {             
+            let actor = ZerowhaleTableCombat.getCombatantActor(combatant);
+            let owner = ZerowhaleTableSettings.getConfiguredOwnerOfActor(actor);
+            if (owner) {
+                await ZerowhaleTableApi.executeCommands(
+                    ZerowhaleTableCommands.setPlayerColor(owner._id, owner.color.css)
+                );
+            }
+        }
+    }
+});
+
 Hooks.on("createActiveEffect", async function(data, options, userId) {
     if (game.user?.isGM) {
         if (data.parent instanceof Actor) {
@@ -81,17 +97,6 @@ Hooks.on("deleteActiveEffect", async function(data, options, userId) {
                     await ZerowhaleTableCombat.updateCurrentCombatantActor(currentCombatantActor);
                 }
             }
-        }
-    }
-});
-
-Hooks.on("dnd5e.preConfigureInitiative", async function(actor, roll) {
-    if (game.user?.isGM) {
-        let owner = ZerowhaleTableSettings.getConfiguredOwnerOfActor(actor);
-        if (owner) {
-            await ZerowhaleTableApi.executeCommands(
-                ZerowhaleTableCommands.setPlayerColor(owner._id, owner.color.css)
-            );
         }
     }
 });
