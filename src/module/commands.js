@@ -21,6 +21,7 @@ export class ZerowhaleTableCommands {
                 "commandAction": "set",
                 "commandType": "SineWave",
                 "commandParameters": {
+                    "name": "baseColor",
                     "colors": [{"color": "#FF0000"}],
                     "amplitudeMultiplier": 1.0,
                     "angleMultiplier": 1.0,
@@ -37,9 +38,10 @@ export class ZerowhaleTableCommands {
             return [
                 {
                     "deviceIndex": position,
-                    "commandAction": "set",
+                    "commandAction": "replaceOrSet",
                     "commandType": "SetPixels",
                     "commandParameters": {
+                        "name": "baseColor",
                         "colors": [{"color": color}]
                     }
                 }
@@ -54,9 +56,10 @@ export class ZerowhaleTableCommands {
             return [
                 {
                     "deviceIndex": position,
-                    "commandAction": "set",
+                    "commandAction": "replaceOrSet",
                     "commandType": "SetPixels",
                     "commandParameters": {
+                        "name": "baseColor",
                         "colors": [
                             {"color":"#ff0000"},
                             {"color": color}
@@ -74,9 +77,10 @@ export class ZerowhaleTableCommands {
             return [
                 {
                     "deviceIndex": position,
-                    "commandAction": "set",
+                    "commandAction": "replaceOrSet",
                     "commandType": "RandomColors",
                     "commandParameters": {
+                        "name": "baseColor",
                         "colors": [
                             {"color": "#ff0000"},
                             {"color": "#ff8000"},
