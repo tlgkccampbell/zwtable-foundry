@@ -1,5 +1,6 @@
 import { MODULE_NAME, TABLE_POSITIONS } from "./const.js"
 
+export const SETTING_TABLE_ENABLED = "zwtable-enabled";
 export const SETTING_BASE_URL = "zwtable-base-url";
 export const SETTING_TABLE_POSITION_0 = "zwtable-pos-0";
 export const SETTING_TABLE_POSITION_1 = "zwtable-pos-1";
@@ -17,7 +18,16 @@ export const SETTING_TABLE_POSITIONS = [
 ];
 
 export class ZerowhaleTableSettings {
-    static registerSettings() {        
+    static registerSettings() {
+        game.settings.register(MODULE_NAME, SETTING_TABLE_ENABLED, {
+            name: "Table Enabled",
+            hint: "Is the table integration enabled?",
+            scope: "world",
+            config: true,
+            type: Boolean,
+            default: true
+        })
+
         game.settings.register(MODULE_NAME, SETTING_BASE_URL, {
             name: "Table API Base URL",
             hint: "The base URL for Zerowhale table API calls.",

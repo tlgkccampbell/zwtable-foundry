@@ -7,7 +7,7 @@
         "name": "Cole Campbell"
       }
     ],
-    "version": "1.0.0",
+    "version": "1.0.1",
     "compatibility": {
       "minimum": "12",
       "verified": "12.331"
@@ -16,5 +16,5 @@
         "./src/zwtable-foundry.js"
     ],
     "manifest": "https://raw.githubusercontent.com/tlgkccampbell/zwtable-foundry/refs/heads/main/module.json",
-    "download": "https://github.com/tlgkccampbell/zwtable-foundry/archive/refs/tags/v1.0.0.zip"
+    "download": "https://github.com/tlgkccampbell/zwtable-foundry/archive/refs/tags/v1.0.1.zip"
   }
