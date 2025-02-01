@@ -32,6 +32,20 @@ export class ZerowhaleTableCommands {
         return commands;
     }
 
+    static setPositionColor(position, color) {
+        return [
+            {
+                "deviceIndex": position,
+                "commandAction": "set",
+                "commandType": "SetPixels",
+                "commandParameters": {
+                    "name": "baseColor",
+                    "colors": [{"color": color}]
+                }
+            }
+        ];
+    }
+
     static setPlayerColor(id, color) {
         let position = ZerowhaleTableSettings.getTablePositionForPlayerId(id);
         if (position >= 0) {

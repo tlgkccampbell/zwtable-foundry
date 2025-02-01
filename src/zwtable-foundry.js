@@ -9,6 +9,25 @@ Hooks.on("ready", async function() {
         await ZerowhaleTableApi.executeCommands(
             ZerowhaleTableCommands.reset()
         );
+
+        window.zwtabletest = async (deviceIndex) => {
+            await ZerowhaleTableApi.executeCommands(
+                ZerowhaleTableCommands.reset()
+            )
+            await ZerowhaleTableApi.executeCommands(
+                ZerowhaleTableCommands.setPositionColor(deviceIndex, "#ffffff")
+            )
+        };
+
+        window.zwtablereset = async () => {
+            await ZerowhaleTableApi.executeCommands(
+                ZerowhaleTableCommands.reset()
+            )
+        };
+
+        window.zwtablecmd = async (commands) => {
+            await ZerowhaleTableApi.executeCommands(commands);
+        }
     }
 })
 
