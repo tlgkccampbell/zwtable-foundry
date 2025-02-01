@@ -7,7 +7,7 @@ export class ZerowhaleTableApi {
         if (enabled) {
             let baseurl = game.settings.get(MODULE_NAME, SETTING_BASE_URL);
             if (baseurl) {
-                await fetch(baseurl + "api/lights/execute/commands", {
+                await fetch(new URL("/api/lights/execute/commands", baseurl).href, {
                     method: "POST",
                     headers: {
                         "Accept": "application/json",

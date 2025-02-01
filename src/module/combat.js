@@ -1,5 +1,6 @@
 import { ZerowhaleTableApi } from "./api.js";
 import { ZerowhaleTableCommands } from "./commands.js";
+import { ZerowhaleTableSettings } from "./settings.js";
 
 export class ZerowhaleTableCombat {
     static getCurrentCombatantActor() {
@@ -22,7 +23,7 @@ export class ZerowhaleTableCombat {
     }
 
     static async updateCurrentCombatantActor(actor) {
-        let owner = game.users.find(u => !u.isGM && actor.testUserPermission(u, "OWNER")) || game.users.find(u => u.isGM);
+        let owner = ZerowhaleTableSettings.getConfiguredOwnerOfActor(actor);
         if (owner) {
             if (actor.statuses.has("charmed")) {
                 await ZerowhaleTableApi.executeCommands(

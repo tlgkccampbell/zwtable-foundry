@@ -55,6 +55,30 @@ export class ZerowhaleTableSettings {
         return choices;
     }
 
+    static getConfiguredPlayerIds() {
+        let ids = [];
+        for (let i = 0; i < TABLE_POSITIONS; i++) {
+            let id = game.settings.get(MODULE_NAME, SETTING_TABLE_POSITIONS[i]);
+            if (id) {
+                ids.push(id);
+            }
+        }
+        return ids;
+    }
+
+    static getConfiguredPlayers() {
+        let configured = new Set(this.getConfiguredPlayerIds());
+        return game.users.filter(u => configured.has(u._id));
+    }
+
+    static getConfiguredOwnerOfActor(actor) {
+        let players = this.getConfiguredPlayers();
+        let owner = 
+            players.find(u => !u.isGM && actor.testUserPermission(u, "OWNER")) || 
+            players.find(u =>  u.isGM && actor.testUserPermission(u, "OWNER"));
+        return owner;
+    }
+
     static getTableApiUrl(url) {
         let baseUrl = game.settings.get(MODULE_NAME, SETTING_BASE_URL);
         return new URL(baseUrl, url).href;

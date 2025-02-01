@@ -87,7 +87,7 @@ Hooks.on("deleteActiveEffect", async function(data, options, userId) {
 
 Hooks.on("dnd5e.preConfigureInitiative", async function(actor, roll) {
     if (game.user?.isGM) {
-        let owner = game.users.find(u => !u.isGM && actor.testUserPermission(u, "OWNER")) || game.users.find(u => u.isGM);
+        let owner = ZerowhaleTableSettings.getConfiguredOwnerOfActor(actor);
         if (owner) {
             await ZerowhaleTableApi.executeCommands(
                 ZerowhaleTableCommands.setPlayerColor(owner._id, owner.color.css)
@@ -98,7 +98,7 @@ Hooks.on("dnd5e.preConfigureInitiative", async function(actor, roll) {
 
 Hooks.on("dnd5e.applyDamage", async function(actor, amount, options) {
     if (game.user?.isGM) {
-        let owner = game.users.find(u => !u.isGM && actor.testUserPermission(u, "OWNER")) || game.users.find(u => u.isGM);
+        let owner = ZerowhaleTableSettings.getConfiguredOwnerOfActor(actor);
         if (owner) {
             await ZerowhaleTableApi.executeCommands(
                 ZerowhaleTableCommands.flashPlayer(owner._id, amount > 0 ? "#ff0000" : "#00ff00")
