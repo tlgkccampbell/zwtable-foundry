@@ -1,0 +1,18 @@
+{
+    "id": "zwtable-foundry",
+    "title": "Zerowhale Table Integration",
+    "description": "A module that integrates the Zerowhale gaming table with Foundry VTT.",
+    "authors": [
+      {
+        "name": "Cole Campbell"
+      }
+    ],
+    "version": "1.0.0",
+    "compatibility": {
+      "minimum": "12",
+      "verified": "12.331"
+    },
+    "esmodules": [
+        "./src/zwtable-foundry.js"
+    ]
+  }
