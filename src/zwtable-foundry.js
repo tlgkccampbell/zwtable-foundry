@@ -74,40 +74,34 @@ Hooks.on("updateCombatant", async function(combatant, changed, options, userId) 
 });
 
 Hooks.on("createActiveEffect", async function(data, options, userId) {
-    if (game.user?.isGM) {
-        if (data.parent instanceof Actor) {
-            let combat = game.combat;
-            if (combat && combat.current) {
-                let currentCombatantActor = ZerowhaleTableCombat.getCurrentCombatantActor();
-                if (currentCombatantActor === data.parent) {
-                    await ZerowhaleTableCombat.updateCurrentCombatantActor(currentCombatantActor);
-                }
+    if (data.parent instanceof Actor) {
+        let combat = game.combat;
+        if (combat && combat.current) {
+            let currentCombatantActor = ZerowhaleTableCombat.getCurrentCombatantActor();
+            if (currentCombatantActor === data.parent) {
+                await ZerowhaleTableCombat.updateCurrentCombatantActor(currentCombatantActor);
             }
         }
     }
 });
 
 Hooks.on("deleteActiveEffect", async function(data, options, userId) {
-    if (game.user?.isGM) {
-        if (data.parent instanceof Actor) {
-            let combat = game.combat;
-            if (combat && combat.current) {
-                let currentCombatantActor = ZerowhaleTableCombat.getCurrentCombatantActor();
-                if (currentCombatantActor === data.parent) {
-                    await ZerowhaleTableCombat.updateCurrentCombatantActor(currentCombatantActor);
-                }
+    if (data.parent instanceof Actor) {
+        let combat = game.combat;
+        if (combat && combat.current) {
+            let currentCombatantActor = ZerowhaleTableCombat.getCurrentCombatantActor();
+            if (currentCombatantActor === data.parent) {
+                await ZerowhaleTableCombat.updateCurrentCombatantActor(currentCombatantActor);
             }
         }
     }
 });
 
 Hooks.on("dnd5e.applyDamage", async function(actor, amount, options) {
-    if (game.user?.isGM) {
-        let owner = ZerowhaleTableSettings.getConfiguredOwnerOfActor(actor);
-        if (owner) {
-            await ZerowhaleTableApi.executeCommands(
-                ZerowhaleTableCommands.flashPlayer(owner._id, amount > 0 ? "#ff0000" : "#00ff00")
-            );
-        }
+    let owner = ZerowhaleTableSettings.getConfiguredOwnerOfActor(actor);
+    if (owner) {
+        await ZerowhaleTableApi.executeCommands(
+            ZerowhaleTableCommands.flashPlayer(owner._id, amount > 0 ? "#ff0000" : "#00ff00")
+        );
     }
 });
