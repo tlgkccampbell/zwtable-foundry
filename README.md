@@ -48,6 +48,24 @@ This means:
 - The table receives exactly one copy of each command, rather than one per connected client.
 - If no GM is logged in, the table is not updated.
 
+## Command stack conventions
+
+The table server gives each light position a stack of commands, composed bottom-up, with each
+command painting into its own range of pixels. The module uses two reserved slot names:
+
+- **`base`** — full width, written with `replaceOrSet`, never expires. Exactly one per
+  position, holding that seat's resolved state.
+- **`accent`** — the last few pixels, written with `replaceOrSet`, never expires. A secondary
+  indicator that coexists with `base`.
+
+Everything else is an anonymous `push` with `expirationTime` always set, so transient effects
+(such as the damage flash) self-expire and reveal the `base` beneath them. See
+`Documentation/command-stack.md` in the table server repository.
+
+Pixel ranges need a table server built after the compositing change. Against an older server
+the range parameters are ignored, so an `accent` would cover the whole strip instead of its
+last few pixels.
+
 ## Console helpers
 
 Available to GMs as globals, and to any client via `game.modules.get("zwtable-foundry").api`:

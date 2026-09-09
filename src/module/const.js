@@ -21,6 +21,17 @@ export const COMMAND_ACTIONS = [
     "pop"
 ];
 
+/**
+ * Reserved command names. The table server matches these by name to replace a command in
+ * place, so each names a slot that persists across updates. See Documentation/command-stack.md
+ * in the table server repository.
+ */
+export const SLOT_BASE = "base";
+export const SLOT_ACCENT = "accent";
+
+/** How many pixels at the end of a strip the accent slot occupies. */
+export const ACCENT_PIXEL_COUNT = 3;
+
 /** The maximum number of commands accepted in a single relayed batch. */
 export const MAX_COMMANDS_PER_BATCH = 64;
 

@@ -178,6 +178,17 @@ export class ZerowhaleTableApi {
             if (!COMMAND_ACTIONS.includes(command.commandAction)) {
                 return null;
             }
+            const parameters = command.commandParameters;
+            if (parameters !== undefined && parameters !== null) {
+                if (typeof parameters !== "object") {
+                    return null;
+                }
+                for (const key of ["startPixel", "pixelCount", "expirationTime"]) {
+                    if (parameters[key] !== undefined && !Number.isInteger(parameters[key])) {
+                        return null;
+                    }
+                }
+            }
         }
         return commands;
     }
