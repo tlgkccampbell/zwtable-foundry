@@ -2,6 +2,7 @@ import { MODULE_NAME, TABLE_POSITIONS } from "./const.js"
 
 export const SETTING_TABLE_ENABLED = "zwtable-enabled";
 export const SETTING_BASE_URL = "zwtable-base-url";
+export const SETTING_DEBUG_LOGGING = "zwtable-debug-logging";
 export const SETTING_TABLE_POSITION_0 = "zwtable-pos-0";
 export const SETTING_TABLE_POSITION_1 = "zwtable-pos-1";
 export const SETTING_TABLE_POSITION_2 = "zwtable-pos-2";
@@ -30,10 +31,20 @@ export class ZerowhaleTableSettings {
 
         game.settings.register(MODULE_NAME, SETTING_BASE_URL, {
             name: "Table API Base URL",
-            hint: "The base URL for Zerowhale table API calls.",
+            hint: "The base URL for Zerowhale table API calls. Only the client which talks to the table needs to be able to reach this address.",
             scope: "world",
             config: true,
-            type: String
+            type: String,
+            default: ""
+        });
+
+        game.settings.register(MODULE_NAME, SETTING_DEBUG_LOGGING, {
+            name: "Debug Logging",
+            hint: "Write table commands and relayed events to this client's browser console.",
+            scope: "client",
+            config: true,
+            type: Boolean,
+            default: false
         });
 
         for (let i = 0; i < TABLE_POSITIONS; i++) {
@@ -49,8 +60,20 @@ export class ZerowhaleTableSettings {
         }
     }
 
+    static get isTableEnabled() {
+        return game.settings.get(MODULE_NAME, SETTING_TABLE_ENABLED) === true;
+    }
+
+    static get isDebugLoggingEnabled() {
+        return game.settings.get(MODULE_NAME, SETTING_DEBUG_LOGGING) === true;
+    }
+
+    static get baseUrl() {
+        return game.settings.get(MODULE_NAME, SETTING_BASE_URL) || "";
+    }
+
     static getPlayerChoices() {
-        let choices = Object.fromEntries(game.users.map(u => [u._id, u.name]));
+        let choices = Object.fromEntries(game.users.map(u => [u.id, u.name]));
         choices[""] = "-- none --";
         return choices;
     }
@@ -68,20 +91,26 @@ export class ZerowhaleTableSettings {
 
     static getConfiguredPlayers() {
         let configured = new Set(this.getConfiguredPlayerIds());
-        return game.users.filter(u => configured.has(u._id));
+        return game.users.filter(u => configured.has(u.id));
     }
 
     static getConfiguredOwnerOfActor(actor) {
+        if (!actor) {
+            return null;
+        }
         let players = this.getConfiguredPlayers();
-        let owner = 
-            players.find(u => !u.isGM && actor.testUserPermission(u, "OWNER")) || 
+        let owner =
+            players.find(u => !u.isGM && actor.testUserPermission(u, "OWNER")) ||
             players.find(u =>  u.isGM && actor.testUserPermission(u, "OWNER"));
-        return owner;
+        return owner ?? null;
     }
 
-    static getTableApiUrl(url) {
-        let baseUrl = game.settings.get(MODULE_NAME, SETTING_BASE_URL);
-        return new URL(baseUrl, url).href;
+    /**
+     * Gets the CSS color string for the specified user. User#color is a Color instance in
+     * modern Foundry versions, but fall back to whatever we were given if that ever changes.
+     */
+    static getUserColorCss(user) {
+        return user?.color?.css ?? (typeof user?.color === "string" ? user.color : "#ffffff");
     }
 
     static getTablePositionForPlayerId(id) {

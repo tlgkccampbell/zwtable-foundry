@@ -1,107 +1,142 @@
+import { MODULE_NAME } from "./module/const.js";
 import { ZerowhaleTableApi } from "./module/api.js";
 import { ZerowhaleTableCombat } from "./module/combat.js";
 import { ZerowhaleTableCommands } from "./module/commands.js";
+import { ZerowhaleTableLog } from "./module/log.js";
 import { ZerowhaleTableSettings } from "./module/settings.js"
 
-Hooks.on("ready", async function() {
+/**
+ * Almost every Foundry hook fires on *every* connected client, so exactly one client has to
+ * own the conversation with the table. That client is the active GM; everyone else either
+ * stays quiet (for hooks which the GM also receives) or relays over the module socket (for
+ * hooks which only fire on the client that performed the action).
+ */
+function isResponsibleClient() {
+    return ZerowhaleTableApi.isResponsibleUser;
+}
+
+Hooks.once("ready", async function() {
     ZerowhaleTableSettings.registerSettings();
-    if (game.user?.isGM) {
+    ZerowhaleTableApi.registerSocketListener();
+    registerModuleApi();
+
+    if (isResponsibleClient()) {
         await ZerowhaleTableApi.executeCommands(
             ZerowhaleTableCommands.reset()
         );
+    }
+});
 
-        window.zwtabletest = async (deviceIndex) => {
+/** Exposes the console/macro helpers, both as globals and as the module's public API. */
+function registerModuleApi() {
+    const api = {
+        commands: ZerowhaleTableCommands,
+        execute: async (commands) => await ZerowhaleTableApi.executeCommands(commands),
+        reset: async () => await ZerowhaleTableApi.executeCommands(ZerowhaleTableCommands.reset()),
+        status: async () => await ZerowhaleTableApi.getStatus(),
+        test: async (deviceIndex) => {
             await ZerowhaleTableApi.executeCommands(
-                ZerowhaleTableCommands.reset()
-            )
-            await ZerowhaleTableApi.executeCommands(
-                ZerowhaleTableCommands.setPositionColor(deviceIndex, "#ffffff")
-            )
-        };
-
-        window.zwtablereset = async () => {
-            await ZerowhaleTableApi.executeCommands(
-                ZerowhaleTableCommands.reset()
-            )
-        };
-
-        window.zwtablecmd = async (commands) => {
-            await ZerowhaleTableApi.executeCommands(commands);
+                ZerowhaleTableCommands.reset().concat(
+                    ZerowhaleTableCommands.setPositionColor(deviceIndex, "#ffffff"))
+            );
         }
-    }
-})
+    };
 
-Hooks.on("createCombat", async function() {
-    if (game.user?.isGM) {
-        await ZerowhaleTableApi.executeCommands(
-            ZerowhaleTableCommands.initiative()
-        );
+    const module = game.modules.get(MODULE_NAME);
+    if (module) {
+        module.api = api;
     }
+
+    if (game.user?.isGM) {
+        window.zwtabletest = api.test;
+        window.zwtablereset = api.reset;
+        window.zwtablecmd = api.execute;
+        window.zwtablestatus = api.status;
+    }
+}
+
+Hooks.on("createCombat", async function(combat, options, userId) {
+    if (!isResponsibleClient()) {
+        return;
+    }
+    await ZerowhaleTableApi.executeCommands(
+        ZerowhaleTableCommands.initiative()
+    );
+});
+
+Hooks.on("deleteCombat", async function(combat, options, userId) {
+    if (!isResponsibleClient()) {
+        return;
+    }
+    await ZerowhaleTableApi.executeCommands(
+        ZerowhaleTableCommands.reset()
+    );
 });
 
 Hooks.on("combatStart", async function(combat, updateData) {
-    if (game.user?.isGM) {
-        await ZerowhaleTableApi.executeCommands(
-            ZerowhaleTableCommands.reset()
-        )
+    if (!isResponsibleClient()) {
+        return;
     }
+    await ZerowhaleTableApi.executeCommands(
+        ZerowhaleTableCommands.reset()
+    );
+    ZerowhaleTableCombat.refreshCurrentCombatant();
 });
 
 Hooks.on("combatTurnChange", async function(combat, prior, current) {
-    if (game.user?.isGM) {
-        await ZerowhaleTableApi.executeCommands(
-            ZerowhaleTableCommands.reset()
-        );
-
-        await ZerowhaleTableCombat.updateCurrentCombatant(combat, current.combatantId, current.tokenId);
+    if (!isResponsibleClient()) {
+        return;
     }
+    await ZerowhaleTableCombat.updateCurrentCombatant(combat, current?.combatantId);
 });
-
 
 Hooks.on("updateCombatant", async function(combatant, changed, options, userId) {
-    if (game.user?.isGM) {
-        let combat = combatant.combat;
-        if (combat && combat.current.round == 0 && changed.initiative) {             
-            let actor = ZerowhaleTableCombat.getCombatantActor(combatant);
-            let owner = ZerowhaleTableSettings.getConfiguredOwnerOfActor(actor);
-            if (owner) {
-                await ZerowhaleTableApi.executeCommands(
-                    ZerowhaleTableCommands.setPlayerColor(owner._id, owner.color.css)
-                );
-            }
-        }
+    if (!isResponsibleClient()) {
+        return;
     }
-});
-
-Hooks.on("createActiveEffect", async function(data, options, userId) {
-    if (data.parent instanceof Actor) {
-        let combat = game.combat;
-        if (combat && combat.current) {
-            let currentCombatantActor = ZerowhaleTableCombat.getCurrentCombatantActor();
-            if (currentCombatantActor === data.parent) {
-                await ZerowhaleTableCombat.updateCurrentCombatantActor(currentCombatantActor);
-            }
-        }
+    const combat = combatant.combat ?? combatant.parent;
+    if (!combat || combat.round !== 0 || changed.initiative == null) {
+        return;
     }
-});
-
-Hooks.on("deleteActiveEffect", async function(data, options, userId) {
-    if (data.parent instanceof Actor) {
-        let combat = game.combat;
-        if (combat && combat.current) {
-            let currentCombatantActor = ZerowhaleTableCombat.getCurrentCombatantActor();
-            if (currentCombatantActor === data.parent) {
-                await ZerowhaleTableCombat.updateCurrentCombatantActor(currentCombatantActor);
-            }
-        }
-    }
-});
-
-Hooks.on("dnd5e.applyDamage", async function(actor, amount, options) {
-    let owner = ZerowhaleTableSettings.getConfiguredOwnerOfActor(actor);
+    const actor = ZerowhaleTableCombat.getCombatantActor(combatant);
+    const owner = ZerowhaleTableSettings.getConfiguredOwnerOfActor(actor);
     if (owner) {
         await ZerowhaleTableApi.executeCommands(
-            ZerowhaleTableCommands.flashPlayer(owner._id, amount > 0 ? "#ff0000" : "#00ff00")
+            ZerowhaleTableCommands.setPlayerColor(owner.id, ZerowhaleTableSettings.getUserColorCss(owner))
+        );
+    }
+});
+
+/**
+ * Active effect hooks fire on every client, so only the responsible one acts. This covers
+ * status changes (bloodied, charmed) regardless of who caused them.
+ */
+async function onActiveEffectChanged(effect) {
+    if (!isResponsibleClient() || !game.combat?.started) {
+        return;
+    }
+    const actor = ZerowhaleTableCombat.getOwningActor(effect);
+    if (!ZerowhaleTableCombat.isCurrentCombatantActor(actor)) {
+        return;
+    }
+    ZerowhaleTableCombat.refreshCurrentCombatant();
+}
+
+Hooks.on("createActiveEffect", onActiveEffectChanged);
+Hooks.on("updateActiveEffect", onActiveEffectChanged);
+Hooks.on("deleteActiveEffect", onActiveEffectChanged);
+
+/**
+ * Unlike the hooks above, dnd5e.applyDamage only fires on the client which applied the
+ * damage -- usually a player, when they apply damage to their own character. It must NOT be
+ * gated on the responsible client; executeCommands() relays it to the GM instead.
+ */
+Hooks.on("dnd5e.applyDamage", async function(actor, amount, options) {
+    const owner = ZerowhaleTableSettings.getConfiguredOwnerOfActor(actor);
+    if (owner) {
+        ZerowhaleTableLog.debug(`${actor.name} took ${amount} damage; flashing ${owner.name}'s position.`);
+        await ZerowhaleTableApi.executeCommands(
+            ZerowhaleTableCommands.flashPlayer(owner.id, amount > 0 ? "#ff0000" : "#00ff00")
         );
     }
 });

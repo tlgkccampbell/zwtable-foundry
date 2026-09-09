@@ -1,1 +1,60 @@
 # zwtable-foundry
+
+A Foundry VTT module that drives the LEDs in the Zerowhale gaming table from what is
+happening in the game.
+
+## What it does
+
+Each player is assigned to one of the table's six light positions. During combat the table
+clears and lights the position of whoever's turn it is, in that player's Foundry colour, and
+reflects their character's state:
+
+| State | Effect |
+| --- | --- |
+| Normal | Solid, in the player's colour |
+| Bloodied | Alternating red and the player's colour |
+| Charmed | Rainbow |
+| Damage taken | Red flash |
+| Healing received | Green flash |
+
+Outside of combat, rolling initiative lights each player's position as they roll.
+
+## Requirements
+
+- Foundry VTT v12 or later (verified against v14.364).
+- The `dnd5e` system, for the damage/healing flash and the bloodied status.
+- A reachable [Zerowhale table server](https://github.com/tlgkccampbell/zwtable).
+
+## Setup
+
+Configure the module under *Game Settings → Configure Settings → Zerowhale Table Integration*:
+
+- **Table Enabled** — master switch for the integration.
+- **Table API Base URL** — e.g. `http://zwtable.local/`. **Only the GM's browser needs to be
+  able to reach this address** (see below).
+- **Player at Table Position 0–5** — which Foundry user sits at each light position.
+- **Debug Logging** — per-client; logs every command and relay to the browser console.
+
+## How commands reach the table
+
+Foundry hooks fire on *every* connected client, so the module nominates a single client — the
+active GM — to talk to the table server. Every other client stays quiet, or relays its events
+to the GM over the module's socket when the triggering hook only fires locally (for example,
+`dnd5e.applyDamage`, which fires only on the client that applied the damage).
+
+This means:
+
+- Players' actions reach the table even though only the GM's browser can see the table server.
+- The table receives exactly one copy of each command, rather than one per connected client.
+- If no GM is logged in, the table is not updated.
+
+## Console helpers
+
+Available to GMs as globals, and to any client via `game.modules.get("zwtable-foundry").api`:
+
+```js
+zwtablestatus()               // query the controller boards
+zwtablereset()                // clear every position
+zwtabletest(0)                // light position 0 white
+zwtablecmd([...])             // send a raw command batch
+```
