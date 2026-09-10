@@ -1,9 +1,10 @@
-import { MODULE_NAME, SLOT_TIMER } from "./module/const.js";
+import { INITIATIVE_PERIOD_FRAMES, MODULE_NAME, SLOT_TIMER } from "./module/const.js";
 import { ZerowhaleTableApi } from "./module/api.js";
 import { ZerowhaleTableCombat } from "./module/combat.js";
 import { ZerowhaleTableCommands } from "./module/commands.js";
 import { ZerowhaleTableLog } from "./module/log.js";
 import { ZerowhaleTableSettings } from "./module/settings.js"
+import { ZerowhaleTableGeometry } from "./module/geometry.js";
 import { ZerowhaleTableTable } from "./module/table.js";
 import { getHitPoints } from "./module/states.js";
 
@@ -28,6 +29,9 @@ Hooks.once("ready", async function() {
     registerModuleApi();
 
     if (isResponsibleClient()) {
+        // Strip lengths come from the table rather than being assumed, so effects which travel
+        // around it stay correct if the hardware changes.
+        await ZerowhaleTableGeometry.load();
         await ZerowhaleTableApi.executeCommands(ZerowhaleTableCommands.reset());
         await applyAmbientScene();
         ZerowhaleTableTable.refresh();
@@ -44,6 +48,14 @@ function registerModuleApi() {
         refresh: () => ZerowhaleTableTable.refresh(),
         reset: async () => await ZerowhaleTableApi.executeCommands(ZerowhaleTableCommands.reset()),
         status: async () => await ZerowhaleTableApi.getStatus(),
+        geometry: ZerowhaleTableGeometry,
+        /** Shows which end of each strip its first LED is at, for the reversed positions setting. */
+        wiring: async () => await ZerowhaleTableApi.executeCommands(
+            ZerowhaleTableCommands.wiringDiagnostic()),
+        /** Runs the initiative wave on its own, to check it travels rather than reflecting. */
+        sweep: async () => await ZerowhaleTableApi.executeCommands(
+            ZerowhaleTableCommands.initiative(
+                ZerowhaleTableGeometry.getWaveParametersForAll(INITIATIVE_PERIOD_FRAMES))),
         test: async (deviceIndex) => {
             await ZerowhaleTableApi.executeCommands(
                 ZerowhaleTableCommands.reset().concat(
@@ -74,6 +86,8 @@ function registerModuleApi() {
         window.zwtablecmd = api.execute;
         window.zwtablestatus = api.status;
         window.zwtablescene = api.setSceneLighting;
+        window.zwtablewiring = api.wiring;
+        window.zwtablesweep = api.sweep;
         window.zwtablerefresh = api.refresh;
     }
 }
@@ -109,7 +123,8 @@ Hooks.on("createCombat", async function(combat, options, userId) {
     if (!isResponsibleClient()) {
         return;
     }
-    await ZerowhaleTableApi.executeCommands(ZerowhaleTableCommands.initiative());
+    await ZerowhaleTableApi.executeCommands(ZerowhaleTableCommands.initiative(
+        ZerowhaleTableGeometry.getWaveParametersForAll(INITIATIVE_PERIOD_FRAMES)));
 });
 
 Hooks.on("deleteCombat", async function(combat, options, userId) {

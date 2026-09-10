@@ -1,5 +1,6 @@
 import {
     ACCENT_PIXEL_COUNT,
+    INITIATIVE_PERIOD_FRAMES,
     COLOR_CONCENTRATION,
     COLOR_CRITICAL,
     COLOR_DAMAGE,
@@ -36,10 +37,17 @@ export class ZerowhaleTableCommands {
         return commands;
     }
 
-    /** The red sweep which runs while initiative is being rolled. */
-    static initiative() {
+    /**
+     * The red wave which runs while initiative is being rolled.
+     *
+     * Given the table's geometry, the six strips carry consecutive slices of a single wave which
+     * travels once around the table. Without it each strip runs its own copy of the same wave,
+     * which reflects wherever two strips meet with their first LEDs adjacent.
+     */
+    static initiative(waves = null) {
         const commands = [];
         for (let i = 0; i < TABLE_POSITIONS; i++) {
+            const wave = waves?.[i];
             commands.push({
                 "deviceIndex": i,
                 "commandAction": "set",
@@ -48,8 +56,39 @@ export class ZerowhaleTableCommands {
                     "name": SLOT_BASE,
                     "colors": [{ "color": COLOR_INITIATIVE }],
                     "amplitudeMultiplier": 1.0,
-                    "angleMultiplier": 1.0,
-                    "loopDuration": 30
+                    "angleMultiplier": wave ? wave.angleMultiplier : 1.0,
+                    "loopDuration": wave ? wave.loopDuration : INITIATIVE_PERIOD_FRAMES / 3,
+                    "phase": wave ? wave.phase : 0,
+                    "reverse": wave ? wave.reverse : false
+                }
+            });
+        }
+        return commands;
+    }
+
+    /**
+     * Lights the first three LEDs of every strip white over a dim base, so that which physical
+     * end of each strip its first LED sits at can simply be read off the table. That is what the
+     * reversed positions setting needs to know.
+     */
+    static wiringDiagnostic() {
+        const commands = [];
+        for (let i = 0; i < TABLE_POSITIONS; i++) {
+            commands.push({
+                "deviceIndex": i,
+                "commandAction": "set",
+                "commandType": "SetPixels",
+                "commandParameters": { "name": SLOT_BASE, "colors": [{ "color": "#101828" }] }
+            });
+            commands.push({
+                "deviceIndex": i,
+                "commandAction": "replaceOrPush",
+                "commandType": "SetPixels",
+                "commandParameters": {
+                    "name": SLOT_PIPS,
+                    "startPixel": 0,
+                    "pixelCount": 3,
+                    "colors": [{ "color": "#ffffff" }]
                 }
             });
         }

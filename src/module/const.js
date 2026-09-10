@@ -54,6 +54,16 @@ export const REQUEST_TIMEOUT_MS = 5000;
 export const FRAMES_PER_SECOND = 30;
 
 /**
+ * Strip lengths, used only until the real ones can be read from the table server. Positions run
+ * clockwise, a single 22 LED strip across each narrow end and a 15 LED strip along each half of
+ * the long sides.
+ */
+export const DEFAULT_PIXEL_COUNTS = [22, 15, 15, 22, 15, 15];
+
+/** How long the initiative wave takes to travel once around the table, in frames. */
+export const INITIATIVE_PERIOD_FRAMES = 90;
+
+/**
  * How prominent a seat is. A seat is at full brightness on its own turn, dimmer when its turn
  * is next, and dimmer still the rest of the time, so the table reads as a party status board
  * without losing track of whose turn it is.

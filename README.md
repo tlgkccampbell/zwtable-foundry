@@ -70,9 +70,33 @@ Configure the module under *Game Settings → Configure Settings → Zerowhale T
 - **Idle Seat Brightness** — how brightly to light seats whose turn it is not, as a percentage.
   At 0 only the active combatant is lit, which is how the table behaved before this was added.
 - **Turn Timer** — seconds before the active seat starts pulsing amber. 0 turns it off.
+- **Reversed Strip Positions** — which strips were wired against the direction the effects
+  travel. See below.
 - One switch per effect, so anything that turns out to be a distraction can be turned off.
   Targeting is off by default; it fires often enough at a busy table to be noise.
 - **Debug Logging** — per-client; logs every command and relay to the browser console.
+
+### Which way round the strips are wired
+
+Positions run clockwise, so the six strips form one closed ring of LEDs, and the initiative wave
+travels around it as a single wave rather than six copies. That needs to know which strips were
+wired against the direction of travel: where two strips meet with their first LEDs adjacent, a
+wave reflects at the seam instead of crossing it, and the table looks divided in half.
+
+To find out, run this from a GM console:
+
+```js
+zwtablewiring()     // lights the first three LEDs of every strip white
+```
+
+Walk round the table. Any strip whose lit end is on the *anticlockwise* side of it goes in
+**Reversed Strip Positions**, comma separated. Then check it:
+
+```js
+zwtablesweep()      // runs the initiative wave on its own
+```
+
+The wave should travel round the table without reversing anywhere. `zwtablereset()` clears it.
 
 ### Scene lighting
 
@@ -149,4 +173,6 @@ zwtablerefresh()              // redraw the table from the current world state
 zwtabletest(0)                // light position 0 white
 zwtablecmd([...])             // send a raw command batch
 zwtablescene("tavern")        // point the current Foundry scene at a table scene
+zwtablewiring()               // show which end of each strip its first LED is at
+zwtablesweep()                // run the initiative wave on its own
 ```

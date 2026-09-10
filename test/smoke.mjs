@@ -49,6 +49,7 @@ const DEFAULT_SETTINGS = [
     ["zwtable-debug-logging", false],
     ["zwtable-idle-brightness", 20],
     ["zwtable-turn-timer-seconds", 0],
+    ["zwtable-reversed-positions", ""],
     ["zwtable-effect-damage", true],
     ["zwtable-effect-criticals", true],
     ["zwtable-effect-concentration", true],
@@ -388,6 +389,69 @@ resetWorld();
 game.scenes.active = { name: "Blank", getFlag: () => null };
 await fire("updateScene", game.scenes.active, { active: true }, {}, "gm1");
 check("a scene with no table scene configured does nothing", posted.length === 0, posted);
+
+// --- Table geometry and the initiative wave -------------------------------------------------
+
+resetWorld();
+const { ZerowhaleTableGeometry } = await import("../src/module/geometry.js");
+const { ZerowhaleTableSettings } = await import("../src/module/settings.js");
+const ZerowhaleTableSettings_reversedForDebug = () => ZerowhaleTableSettings.reversedPositions;
+
+check("the ring totals every strip's LEDs",
+    ZerowhaleTableGeometry.totalPixels === 104, ZerowhaleTableGeometry.totalPixels);
+check("offsets accumulate around the ring",
+    [0, 22, 37, 52, 74, 89].every((expected, i) => ZerowhaleTableGeometry.getOffset(i) === expected),
+    [0,1,2,3,4,5].map(i => ZerowhaleTableGeometry.getOffset(i)));
+
+check("no strips are treated as reversed by default",
+    [0, 1, 2, 3, 4, 5].every(p => !ZerowhaleTableGeometry.isReversed(p)) &&
+    ZerowhaleTableGeometry.getWaveParametersForAll(90).every(w => w.reverse === false),
+    ZerowhaleTableSettings_reversedForDebug());
+
+settings.set("zwtable-reversed-positions", "3,4,5");
+check("reversed positions are read from the setting",
+    [3, 4, 5].every(p => ZerowhaleTableGeometry.isReversed(p)) &&
+    [0, 1, 2].every(p => !ZerowhaleTableGeometry.isReversed(p)));
+
+settings.set("zwtable-reversed-positions", " 2 , 9 , x ");
+check("nonsense in the reversed positions setting is ignored",
+    ZerowhaleTableGeometry.isReversed(2) && !ZerowhaleTableGeometry.isReversed(9),
+    settings.get("zwtable-reversed-positions"));
+settings.set("zwtable-reversed-positions", "3,4,5");
+
+const waves = ZerowhaleTableGeometry.getWaveParametersForAll(90);
+check("each strip is given its own share of the wave",
+    Math.abs(waves[0].angleMultiplier - 22 / 104) < 1e-9 &&
+    Math.abs(waves[1].angleMultiplier - 15 / 104) < 1e-9, waves.map(w => w.angleMultiplier));
+check("loop durations are fractional, so the strips do not drift apart",
+    waves.some(w => !Number.isInteger(w.loopDuration)), waves.map(w => w.loopDuration));
+check("every strip turns at the same rate",
+    waves.every(w => Math.abs((w.loopDuration / w.angleMultiplier) - 90) < 1e-9),
+    waves.map(w => w.loopDuration / w.angleMultiplier));
+check("phases follow the strips' positions around the ring",
+    waves.every((w, i) => Math.abs(w.phase - ZerowhaleTableGeometry.getOffset(i) / 104) < 1e-9),
+    waves.map(w => w.phase));
+check("the reversed strips are marked as such",
+    waves.map(w => w.reverse).join() === "false,false,false,true,true,true",
+    waves.map(w => w.reverse));
+
+reset();
+await fire("createCombat", {}, {}, "gm");
+const sweep = posted[0]?.body?.commands ?? [];
+check("the initiative sweep sends one wave slice per position",
+    sweep.length === 6 && sweep.every(c => c.commandType === "SineWave"), sweep);
+check("and carries the phase and direction of each strip",
+    sweep[3]?.commandParameters?.reverse === true &&
+    sweep[0]?.commandParameters?.reverse === false &&
+    Math.abs(sweep[3].commandParameters.phase - 52 / 104) < 1e-9, sweep.map(c => c.commandParameters));
+
+check("the wiring diagnostic lights the first LEDs of every strip",
+    (() => {
+        const cmds = ZerowhaleTableCommands.wiringDiagnostic();
+        const pips = cmds.filter(c => c.commandParameters?.name === "pips");
+        return pips.length === 6 && pips.every(c => c.commandParameters.startPixel === 0 &&
+            c.commandParameters.pixelCount === 3);
+    })());
 
 // --- Master switch ------------------------------------------------------------------------------
 

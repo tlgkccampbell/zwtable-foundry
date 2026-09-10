@@ -5,6 +5,7 @@ export const SETTING_BASE_URL = "zwtable-base-url";
 export const SETTING_DEBUG_LOGGING = "zwtable-debug-logging";
 export const SETTING_IDLE_BRIGHTNESS = "zwtable-idle-brightness";
 export const SETTING_TURN_TIMER_SECONDS = "zwtable-turn-timer-seconds";
+export const SETTING_REVERSED_POSITIONS = "zwtable-reversed-positions";
 export const SETTING_TABLE_POSITION_0 = "zwtable-pos-0";
 export const SETTING_TABLE_POSITION_1 = "zwtable-pos-1";
 export const SETTING_TABLE_POSITION_2 = "zwtable-pos-2";
@@ -75,6 +76,16 @@ export class ZerowhaleTableSettings {
             onChange: () => ZerowhaleTableSettings.onDisplayChanged()
         });
 
+        game.settings.register(MODULE_NAME, SETTING_REVERSED_POSITIONS, {
+            name: "Reversed Strip Positions",
+            hint: "Positions whose strip was wired against the direction effects travel around the table, comma separated. Leave empty unless the real table disagrees. To check, run zwtablewiring() from a GM console: it lights the first three LEDs of every strip, and any strip whose lit end is on the anticlockwise side belongs in this list.",
+            scope: "world",
+            config: true,
+            type: String,
+            default: "",
+            onChange: () => ZerowhaleTableSettings.onDisplayChanged()
+        });
+
         game.settings.register(MODULE_NAME, SETTING_TURN_TIMER_SECONDS, {
             name: "Turn Timer (seconds)",
             hint: "Pulse amber over the active seat once a turn has run this long. 0 turns the timer off.",
@@ -136,6 +147,17 @@ export class ZerowhaleTableSettings {
             return 0.2;
         }
         return Math.max(0, Math.min(100, percent)) / 100;
+    }
+
+    /** Positions whose strip runs the opposite way round the table. */
+    static get reversedPositions() {
+        const raw = game.settings.get(MODULE_NAME, SETTING_REVERSED_POSITIONS);
+        if (typeof raw !== "string" || !raw.trim()) {
+            return [];
+        }
+        return raw.split(",")
+            .map(part => Number.parseInt(part.trim(), 10))
+            .filter(value => Number.isInteger(value) && value >= 0 && value < TABLE_POSITIONS);
     }
 
     static get turnTimerSeconds() {
