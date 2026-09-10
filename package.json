@@ -1,0 +1,10 @@
+{
+  "name": "zwtable-foundry",
+  "version": "1.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Tooling for the Zerowhale table Foundry VTT module. Foundry itself does not use this file.",
+  "scripts": {
+    "test": "node test/smoke.mjs"
+  }
+}

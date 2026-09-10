@@ -124,7 +124,7 @@ export class ZerowhaleTableCommands {
             return [
                 {
                     "deviceIndex": position,
-                    "commandAction": "replaceOrSet",
+                    "commandAction": "replaceOrPush",
                     "commandType": "SetPixels",
                     "commandParameters": {
                         "name": SLOT_ACCENT,

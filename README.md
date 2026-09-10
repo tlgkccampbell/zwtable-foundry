@@ -55,8 +55,9 @@ command painting into its own range of pixels. The module uses two reserved slot
 
 - **`base`** — full width, written with `replaceOrSet`, never expires. Exactly one per
   position, holding that seat's resolved state.
-- **`accent`** — the last few pixels, written with `replaceOrSet`, never expires. A secondary
-  indicator that coexists with `base`.
+- **`accent`** — the last few pixels, written with `replaceOrPush`, never expires. A secondary
+  indicator that coexists with `base`. It must not use `replaceOrSet`: with no accent yet on the
+  stack that falls back to `set`, which clears the stack and takes `base` with it.
 
 Everything else is an anonymous `push` with `expirationTime` always set, so transient effects
 (such as the damage flash) self-expire and reveal the `base` beneath them. See
@@ -65,6 +66,17 @@ Everything else is an anonymous `push` with `expirationTime` always set, so tran
 Pixel ranges need a table server built after the compositing change. Against an older server
 the range parameters are ignored, so an `accent` would cover the whole strip instead of its
 last few pixels.
+
+## Development
+
+`npm test` runs the module's smoke tests against a small mock of the Foundry globals. They
+cover the part that cannot be checked by reading the code: which client ends up talking to the
+table. Foundry fires most hooks on every connected client, and exactly one of them may send a
+command.
+
+To see what the module is actually doing to the lights without the table present, run the table
+server with `ZWTABLE_SIMULATE_HARDWARE=true` and open its root page, which renders every strip
+live. `package.json` and `test/` are tooling only; Foundry loads what `module.json` declares.
 
 ## Console helpers
 
