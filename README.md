@@ -5,25 +5,59 @@ happening in the game.
 
 ## What it does
 
-Each player is assigned to one of the table's six light positions. During combat the table
-clears and lights the position of whoever's turn it is, in that player's Foundry colour, and
-reflects their character's state:
+Each player is assigned to one of the table's six light positions. Every seated player's
+position is lit, so the table is a party status board at a glance -- the active seat at full
+brightness, the seat whose turn is next dimmer, the rest dimmer still.
+
+### States
+
+Exactly one state applies to a character at a time. They are listed most significant first, and
+that order is the precedence.
 
 | State | Effect |
 | --- | --- |
-| Normal | Solid, in the player's colour |
-| Bloodied | Alternating red and the player's colour |
+| Dead | Dim grey |
+| Dying (0 hp) | Slow red throb, with death save progress at either end of the strip |
+| Unconscious | Dim grey-blue |
 | Charmed | Rainbow |
-| Damage taken | Red flash |
-| Healing received | Green flash |
+| Bloodied | Red alternating with the player's colour |
+| Normal | Solid, in the player's colour |
 
-Outside of combat, rolling initiative lights each player's position as they roll.
+### Overlays
+
+Overlays sit above the state without replacing it, on a few pixels at one end of the strip.
+
+| Overlay | Effect |
+| --- | --- |
+| Concentration | Cyan pulse at the far end of the strip |
+| Death save successes | Up to three green pips at the near end |
+| Death save failures | Up to three red pips at the far end |
+| Turn over time | Amber pulse across the seat, once a turn has run longer than the configured limit |
+
+### Events
+
+Events flash briefly above everything and expire on their own.
+
+| Event | Effect |
+| --- | --- |
+| Damage | Red flash, longer and faster the more of the character's health it took |
+| Healing | Green flash |
+| Critical hit | Fast gold flash |
+| Fumble | Two slow dark red flashes |
+| Death save | White on a success, red on a failure |
+| Rest finished | A wave of warm light travelling around the table |
+| Targeted | A single white blink (off by default) |
+
+Outside combat, rolling initiative lights each player's position as they roll, and the active
+Foundry scene can run a stored table scene for ambient lighting.
 
 ## Requirements
 
 - Foundry VTT v12 or later (verified against v14.364).
 - The `dnd5e` system, for the damage/healing flash and the bloodied status.
-- A reachable [Zerowhale table server](https://github.com/tlgkccampbell/zwtable).
+- A reachable [Zerowhale table server](https://github.com/tlgkccampbell/zwtable). Pixel ranges,
+  remove-by-name and the slowed crawl are all needed by the effects above, so the server has to
+  be built from a commit that has them.
 
 ## Setup
 
@@ -33,7 +67,24 @@ Configure the module under *Game Settings → Configure Settings → Zerowhale T
 - **Table API Base URL** — e.g. `http://zwtable.local/`. **Only the GM's browser needs to be
   able to reach this address** (see below).
 - **Player at Table Position 0–5** — which Foundry user sits at each light position.
+- **Idle Seat Brightness** — how brightly to light seats whose turn it is not, as a percentage.
+  At 0 only the active combatant is lit, which is how the table behaved before this was added.
+- **Turn Timer** — seconds before the active seat starts pulsing amber. 0 turns it off.
+- One switch per effect, so anything that turns out to be a distraction can be turned off.
+  Targeting is off by default; it fires often enough at a busy table to be noise.
 - **Debug Logging** — per-client; logs every command and relay to the browser console.
+
+### Scene lighting
+
+A Foundry scene can name a scene stored on the table server, which the table runs whenever that
+Foundry scene is activated and no combat is running. Set it from a GM console while viewing the
+scene:
+
+```js
+zwtablescene("tavern")   // clear it again with zwtablescene("")
+```
+
+The table scene has to exist on the server already; create one with `POST /api/scenes`.
 
 ## How commands reach the table
 
@@ -85,6 +136,8 @@ Available to GMs as globals, and to any client via `game.modules.get("zwtable-fo
 ```js
 zwtablestatus()               // query the controller boards
 zwtablereset()                // clear every position
+zwtablerefresh()              // redraw the table from the current world state
 zwtabletest(0)                // light position 0 white
 zwtablecmd([...])             // send a raw command batch
+zwtablescene("tavern")        // point the current Foundry scene at a table scene
 ```

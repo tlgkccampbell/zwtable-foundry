@@ -1,13 +1,7 @@
-import { ZerowhaleTableApi } from "./api.js";
 import { ZerowhaleTableCommands } from "./commands.js";
 import { ZerowhaleTableSettings } from "./settings.js";
 
-/** How long to coalesce rapid state changes before refreshing the table, in milliseconds. */
-const REFRESH_DEBOUNCE_MS = 100;
-
 export class ZerowhaleTableCombat {
-    static #debouncedRefresh = null;
-
     /**
      * Resolves the actor which a combatant represents. Combatant#actor returns the token's
      * actor, which for an unlinked token is a synthetic actor distinct from the world actor
@@ -32,6 +26,23 @@ export class ZerowhaleTableCombat {
     }
 
     /**
+     * The combatant whose turn follows the current one, wrapping to the top of the order at the
+     * end of a round. Null if the encounter has not started or has no living turn order.
+     */
+    static getNextCombatant() {
+        const combat = game.combat;
+        if (!combat?.started) {
+            return null;
+        }
+
+        const turns = combat.turns ?? [];
+        if (turns.length < 2 || typeof combat.turn !== "number") {
+            return null;
+        }
+        return turns[(combat.turn + 1) % turns.length] ?? null;
+    }
+
+    /**
      * Resolves the actor which an embedded document ultimately belongs to. An active effect
      * may live directly on an actor, or on an item which itself belongs to one.
      */
@@ -51,53 +62,25 @@ export class ZerowhaleTableCombat {
         return !!actor && !!current && current.uuid === actor.uuid;
     }
 
-    /**
-     * Builds the commands which express an actor's current state at their table position.
-     * These use "replaceOrSet", so they leave transient commands (such as a damage flash)
-     * further up the position's command stack alone.
-     */
-    static getActorCommands(actor) {
+    /** Whether an actor sits at the table at all, and so is worth reacting to. */
+    static isSeated(actor) {
         const owner = ZerowhaleTableSettings.getConfiguredOwnerOfActor(actor);
-        if (!owner) {
-            return [];
-        }
-        const color = ZerowhaleTableSettings.getUserColorCss(owner);
-        const statuses = actor.statuses ?? new Set();
-        if (statuses.has("charmed")) {
-            return ZerowhaleTableCommands.setPlayerRainbowWave(owner.id);
-        }
-        if (statuses.has("bloodied")) {
-            return ZerowhaleTableCommands.setPlayerColorBloodied(owner.id, color);
-        }
-        return ZerowhaleTableCommands.setPlayerColor(owner.id, color);
+        return !!owner && ZerowhaleTableSettings.getTablePositionForPlayerId(owner.id) >= 0;
     }
 
-    /**
-     * Clears the table and lights the position of whoever's turn it now is, as a single batch
-     * so the table does not briefly go dark between the two requests.
-     */
-    static async updateCurrentCombatant(combat, combatantId) {
-        const combatant = combatantId ? (combat?.combatants?.get(combatantId) ?? null) : null;
-        const commands = ZerowhaleTableCommands.reset().concat(this.getActorCommands(this.getCombatantActor(combatant)));
-        await ZerowhaleTableApi.executeCommands(commands);
+    /** The actor an activity, roll subject or chat message subject belongs to. */
+    static getSubjectActor(subject) {
+        if (!subject) {
+            return null;
+        }
+        if (subject.documentName === "Actor") {
+            return subject;
+        }
+        return subject.actor ?? this.getOwningActor(subject) ?? null;
     }
 
-    static async updateCurrentCombatantActor(actor) {
-        await ZerowhaleTableApi.executeCommands(this.getActorCommands(actor));
-    }
-
-    /**
-     * Refreshes the lights of whoever's turn it currently is. Debounced, both to coalesce
-     * bursts of changes (several effects applied at once) into one request and to let Foundry
-     * finish re-preparing actor data before the resulting statuses are read.
-     */
-    static refreshCurrentCombatant() {
-        this.#debouncedRefresh ??= foundry.utils.debounce(() => {
-            const actor = this.getCurrentCombatantActor();
-            if (actor) {
-                this.updateCurrentCombatantActor(actor);
-            }
-        }, REFRESH_DEBOUNCE_MS);
-        this.#debouncedRefresh();
+    /** Convenience wrapper kept for macros written against earlier versions. */
+    static resetCommands() {
+        return ZerowhaleTableCommands.reset();
     }
 }

@@ -3,6 +3,7 @@ import {
     MAX_COMMANDS_PER_BATCH,
     REQUEST_TIMEOUT_MS,
     SOCKET_MESSAGE_EXECUTE_COMMANDS,
+    SOCKET_MESSAGE_EXECUTE_SCENE,
     SOCKET_NAME,
     TABLE_POSITIONS
 } from "./const.js";
@@ -36,19 +37,31 @@ export class ZerowhaleTableApi {
      */
     static registerSocketListener() {
         game.socket.on(SOCKET_NAME, async (payload) => {
-            if (payload?.type !== SOCKET_MESSAGE_EXECUTE_COMMANDS) {
-                return;
-            }
             if (!this.isResponsibleUser) {
                 return;
             }
-            const commands = this.#sanitizeCommands(payload.commands);
-            if (!commands) {
-                ZerowhaleTableLog.warn("Discarded a malformed relayed command batch.", payload);
+
+            const from = game.users.get(payload?.userId)?.name ?? payload?.userId;
+
+            if (payload?.type === SOCKET_MESSAGE_EXECUTE_COMMANDS) {
+                const commands = this.#sanitizeCommands(payload.commands);
+                if (!commands) {
+                    ZerowhaleTableLog.warn("Discarded a malformed relayed command batch.", payload);
+                    return;
+                }
+                ZerowhaleTableLog.debug(`Executing ${commands.length} command(s) relayed by ${from}.`);
+                await this.#postCommands(commands);
                 return;
             }
-            ZerowhaleTableLog.debug(`Executing ${commands.length} command(s) relayed by ${game.users.get(payload.userId)?.name ?? payload.userId}.`);
-            await this.#postCommands(commands);
+
+            if (payload?.type === SOCKET_MESSAGE_EXECUTE_SCENE) {
+                if (typeof payload.name !== "string" || !payload.name || payload.name.length > 64) {
+                    ZerowhaleTableLog.warn("Discarded a malformed relayed scene.", payload);
+                    return;
+                }
+                ZerowhaleTableLog.debug(`Executing scene "${payload.name}" relayed by ${from}.`);
+                await this.#postScene(payload.name);
+            }
         });
     }
 
@@ -81,6 +94,38 @@ export class ZerowhaleTableApi {
             type: SOCKET_MESSAGE_EXECUTE_COMMANDS,
             userId: game.user?.id,
             commands: commands
+        });
+    }
+
+    /**
+     * Runs a scene stored on the table server by name. Scenes live in the server's database
+     * rather than being sent as commands, so this is one request no matter how elaborate.
+     */
+    static async executeScene(name) {
+        if (typeof name !== "string" || !name) {
+            return;
+        }
+        if (!ZerowhaleTableSettings.isTableEnabled) {
+            ZerowhaleTableLog.debug(`Table integration is disabled; not running scene "${name}".`);
+            return;
+        }
+
+        if (this.isResponsibleUser) {
+            await this.#postScene(name);
+            return;
+        }
+
+        const responsible = this.responsibleUser;
+        if (!responsible) {
+            ZerowhaleTableLog.debug(`No active GM is connected; cannot run scene "${name}".`);
+            return;
+        }
+
+        ZerowhaleTableLog.debug(`Relaying scene "${name}" to ${responsible.name}.`);
+        game.socket.emit(SOCKET_NAME, {
+            type: SOCKET_MESSAGE_EXECUTE_SCENE,
+            userId: game.user?.id,
+            name: name
         });
     }
 
@@ -118,6 +163,38 @@ export class ZerowhaleTableApi {
         } catch (err) {
             ZerowhaleTableLog.warn(`"${baseurl}" is not a valid table API base URL.`, err);
             return null;
+        }
+    }
+
+    static async #postScene(name) {
+        if (!ZerowhaleTableSettings.isTableEnabled) {
+            return;
+        }
+        const url = this.#buildUrl("/api/lights/execute/scene");
+        if (!url) {
+            return;
+        }
+
+        ZerowhaleTableLog.debug(`POST ${url}`, name);
+        try {
+            const response = await fetch(url, {
+                method: "POST",
+                headers: {
+                    "Accept": "application/json",
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ "name": name }),
+                signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+            });
+            if (response.status === 404) {
+                // A Foundry scene naming a table scene which has not been created is a
+                // configuration mistake, not a fault, so say so plainly and once.
+                this.#warnThrottled(`The table server has no scene named "${name}".`);
+            } else if (!response.ok) {
+                this.#warnThrottled(`Table server responded with ${response.status} ${response.statusText}.`);
+            }
+        } catch (err) {
+            this.#warnThrottled(`Could not reach the table server at ${url}.`, err);
         }
     }
 
