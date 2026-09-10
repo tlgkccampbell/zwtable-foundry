@@ -127,7 +127,16 @@ command.
 
 To see what the module is actually doing to the lights without the table present, start the
 table server with `dotnet run --launch-profile simulated` and open its root page, which renders
-every strip live. `package.json` and `test/` are tooling only; Foundry loads what `module.json` declares.
+every strip live. Then drive a whole encounter through it:
+
+```
+node test/combat_sim.mjs 1     # out of combat, initiative, combat start
+node test/combat_sim.mjs 2     # criticals, concentration, scaled damage
+node test/combat_sim.mjs 3     # death saves, healing, rest sweep, combat end
+```
+
+That runs the module's own command builders and hooks against the running server, so what
+reaches the table is what Foundry would send. It needs the server on `localhost:5000`. `package.json` and `test/` are tooling only; Foundry loads what `module.json` declares.
 
 ## Console helpers
 
