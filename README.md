@@ -74,9 +74,9 @@ cover the part that cannot be checked by reading the code: which client ends up 
 table. Foundry fires most hooks on every connected client, and exactly one of them may send a
 command.
 
-To see what the module is actually doing to the lights without the table present, run the table
-server with `ZWTABLE_SIMULATE_HARDWARE=true` and open its root page, which renders every strip
-live. `package.json` and `test/` are tooling only; Foundry loads what `module.json` declares.
+To see what the module is actually doing to the lights without the table present, start the
+table server with `dotnet run --launch-profile simulated` and open its root page, which renders
+every strip live. `package.json` and `test/` are tooling only; Foundry loads what `module.json` declares.
 
 ## Console helpers
 
