@@ -2,6 +2,7 @@ import { MODULE_NAME, TABLE_POSITIONS } from "./const.js"
 
 export const SETTING_TABLE_ENABLED = "zwtable-enabled";
 export const SETTING_BASE_URL = "zwtable-base-url";
+export const SETTING_API_KEY = "zwtable-api-key";
 export const SETTING_DEBUG_LOGGING = "zwtable-debug-logging";
 export const SETTING_IDLE_BRIGHTNESS = "zwtable-idle-brightness";
 export const SETTING_TURN_TIMER_SECONDS = "zwtable-turn-timer-seconds";
@@ -51,6 +52,15 @@ export class ZerowhaleTableSettings {
             name: "Table API Base URL",
             hint: "The base URL for Zerowhale table API calls. Only the client which talks to the table needs to be able to reach this address.",
             scope: "world",
+            config: true,
+            type: String,
+            default: ""
+        });
+
+        game.settings.register(MODULE_NAME, SETTING_API_KEY, {
+            name: "Table API Key",
+            hint: "The shared secret, if the table server was given one (ZWTABLE_API_KEY). Leave empty if it was not. Stored per client rather than in the world, so that it is not handed to every player who logs in -- set it on each machine you run the game from.",
+            scope: "client",
             config: true,
             type: String,
             default: ""
@@ -134,6 +144,19 @@ export class ZerowhaleTableSettings {
 
     static get isDebugLoggingEnabled() {
         return game.settings.get(MODULE_NAME, SETTING_DEBUG_LOGGING) === true;
+    }
+
+    /**
+     * The shared secret to present to the table server. Client scoped, so this is whatever the
+     * client doing the talking was given; an empty string means the server wants none.
+     */
+    static get apiKey() {
+        try {
+            return game.settings.get(MODULE_NAME, SETTING_API_KEY) || "";
+        } catch {
+            // Not registered yet.
+            return "";
+        }
     }
 
     static get baseUrl() {

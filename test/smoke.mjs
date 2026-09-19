@@ -46,6 +46,7 @@ users.activeGM = gm;
 const DEFAULT_SETTINGS = [
     ["zwtable-enabled", true],
     ["zwtable-base-url", "http://table.local/"],
+    ["zwtable-api-key", ""],
     ["zwtable-debug-logging", false],
     ["zwtable-idle-brightness", 20],
     ["zwtable-turn-timer-seconds", 0],
@@ -81,7 +82,7 @@ globalThis.game = {
 globalThis.foundry = { utils: { debounce: (fn, ms) => (...a) => setTimeout(() => fn(...a), ms) } };
 globalThis.window = globalThis;
 globalThis.fetch = async (url, options) => {
-    posted.push({ url, body: JSON.parse(options.body ?? "{}") });
+    posted.push({ url, headers: options.headers ?? {}, body: JSON.parse(options.body ?? "{}") });
     return { ok: true, status: 200, statusText: "OK", json: async () => [] };
 };
 
@@ -452,6 +453,77 @@ check("the wiring diagnostic lights the first LEDs of every strip",
         return pips.length === 6 && pips.every(c => c.commandParameters.startPixel === 0 &&
             c.commandParameters.pixelCount === 3);
     })());
+
+// --- The shared secret -----------------------------------------------------------------------
+
+resetWorld();
+await fire("dnd5e.applyDamage", aliceActor, 7, {});
+check("no API key header is sent when the table server was not given one",
+    posted.length === 1 && !("X-Api-Key" in posted[0].headers), posted[0]?.headers);
+
+resetWorld();
+settings.set("zwtable-api-key", "correct-horse-battery-staple");
+await fire("dnd5e.applyDamage", aliceActor, 7, {});
+check("the configured API key is presented to the table server",
+    posted[0]?.headers["X-Api-Key"] === "correct-horse-battery-staple", posted[0]?.headers);
+check("and does not displace the headers the request already needed",
+    posted[0]?.headers["Content-Type"] === "application/json" &&
+    posted[0]?.headers["Accept"] === "application/json", posted[0]?.headers);
+
+// The secret is client scoped, so a player relaying an event never handles it: the batch goes
+// over the socket and the GM's own client is what presents the key.
+resetWorld();
+settings.set("zwtable-api-key", "correct-horse-battery-staple");
+game.user = alice;
+await fire("dnd5e.applyDamage", aliceActor, 7, {});
+check("a relayed event carries no key, because the GM's client is what talks to the table",
+    posted.length === 0 && emitted.length === 1 &&
+    !JSON.stringify(emitted[0]).includes("correct-horse"), { posted, emitted });
+resetWorld();
+
+// --- Which addresses the browser will let us reach ------------------------------------------
+
+const { classifyAddressSpace, diagnoseAddressSpace } = await import("../src/module/network.js");
+
+check("the address space of a table is classified the way the browser classifies it",
+    classifyAddressSpace("192.168.1.10") === "local" &&
+    classifyAddressSpace("10.1.2.3") === "local" &&
+    classifyAddressSpace("172.16.0.1") === "local" &&
+    classifyAddressSpace("172.32.0.1") === "public" &&
+    classifyAddressSpace("zwtable.local") === "local" &&
+    classifyAddressSpace("127.0.0.1") === "loopback" &&
+    classifyAddressSpace("localhost") === "loopback" &&
+    classifyAddressSpace("[fd00::1]") === "local" &&
+    classifyAddressSpace("8.8.8.8") === "public");
+
+// Tailscale hands out addresses from the RFC 6598 shared range, and browsers count that as
+// the local network, so a table reached over Tailscale is subject to the same rule.
+check("a Tailscale address counts as the local network",
+    classifyAddressSpace("100.95.111.33") === "local");
+
+check("an insecurely hosted Foundry server is told why the browser refused the request",
+    /refused to send this request/.test(
+        diagnoseAddressSpace("http://100.95.111.33/api/lights",
+            { isSecureContext: false, hostname: "108.52.205.142" }) ?? ""));
+
+// Classifying by name is a guess, so it is deliberately made in the direction that stays
+// quiet: a Foundry server reached by a bare hostname or a domain is on the local network often
+// enough that calling it public would warn working setups that they are broken.
+check("names which could resolve either way are not used to claim a block",
+    classifyAddressSpace("fulgora") === "local" &&
+    classifyAddressSpace("foundry.example.com") === "unknown" &&
+    diagnoseAddressSpace("http://192.168.1.50/api/lights",
+        { isSecureContext: false, hostname: "fulgora" }) === null &&
+    diagnoseAddressSpace("http://192.168.1.50/api/lights",
+        { isSecureContext: false, hostname: "foundry.example.com" }) === null);
+
+check("but an ordinary outage is not blamed on the browser",
+    diagnoseAddressSpace("http://table.local/api/lights",
+        { isSecureContext: false, hostname: "192.168.1.9" }) === null &&
+    diagnoseAddressSpace("http://100.95.111.33/api/lights",
+        { isSecureContext: true, hostname: "foundry.example.com" }) === null &&
+    diagnoseAddressSpace("http://table.example.com/api/lights",
+        { isSecureContext: false, hostname: "108.52.205.142" }) === null);
 
 // --- Master switch ------------------------------------------------------------------------------
 

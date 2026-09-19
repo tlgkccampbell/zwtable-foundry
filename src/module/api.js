@@ -1,4 +1,5 @@
 import {
+    API_KEY_HEADER,
     COMMAND_ACTIONS,
     MAX_COMMANDS_PER_BATCH,
     REQUEST_TIMEOUT_MS,
@@ -8,6 +9,7 @@ import {
     TABLE_POSITIONS
 } from "./const.js";
 import { ZerowhaleTableLog } from "./log.js";
+import { diagnoseAddressSpace } from "./network.js";
 import { ZerowhaleTableSettings } from "./settings.js";
 
 /** How often, at most, to warn about an unreachable table server. */
@@ -138,16 +140,16 @@ export class ZerowhaleTableApi {
         try {
             const response = await fetch(url, {
                 method: "GET",
-                headers: { "Accept": "application/json" },
+                headers: this.#headers(),
                 signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
             });
             if (!response.ok) {
-                ZerowhaleTableLog.warn(`Table server responded with ${response.status} ${response.statusText}.`);
+                ZerowhaleTableLog.warn(this.#describeResponse(response));
                 return null;
             }
             return await response.json();
         } catch (err) {
-            ZerowhaleTableLog.warn(`Could not reach the table server at ${url}.`, err);
+            ZerowhaleTableLog.warn(...this.#unreachable(url, err));
             return null;
         }
     }
@@ -179,10 +181,7 @@ export class ZerowhaleTableApi {
         try {
             const response = await fetch(url, {
                 method: "POST",
-                headers: {
-                    "Accept": "application/json",
-                    "Content-Type": "application/json"
-                },
+                headers: this.#headers({ "Content-Type": "application/json" }),
                 body: JSON.stringify({ "name": name }),
                 signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
             });
@@ -191,10 +190,10 @@ export class ZerowhaleTableApi {
                 // configuration mistake, not a fault, so say so plainly and once.
                 this.#warnThrottled(`The table server has no scene named "${name}".`);
             } else if (!response.ok) {
-                this.#warnThrottled(`Table server responded with ${response.status} ${response.statusText}.`);
+                this.#warnThrottled(this.#describeResponse(response));
             }
         } catch (err) {
-            this.#warnThrottled(`Could not reach the table server at ${url}.`, err);
+            this.#warnThrottled(...this.#unreachable(url, err));
         }
     }
 
@@ -211,19 +210,66 @@ export class ZerowhaleTableApi {
         try {
             const response = await fetch(url, {
                 method: "POST",
-                headers: {
-                    "Accept": "application/json",
-                    "Content-Type": "application/json"
-                },
+                headers: this.#headers({ "Content-Type": "application/json" }),
                 body: JSON.stringify({ "commands": commands }),
                 signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
             });
             if (!response.ok) {
-                this.#warnThrottled(`Table server responded with ${response.status} ${response.statusText}.`);
+                this.#warnThrottled(this.#describeResponse(response));
             }
         } catch (err) {
-            this.#warnThrottled(`Could not reach the table server at ${url}.`, err);
+            this.#warnThrottled(...this.#unreachable(url, err));
         }
+    }
+
+    /**
+     * The headers every request carries. The shared secret is added only when one is
+     * configured, because a table on a private network is usually given none -- and because
+     * sending the header at all makes the request one the browser must preflight.
+     */
+    static #headers(extra) {
+        const headers = { "Accept": "application/json", ...extra };
+        const apiKey = ZerowhaleTableSettings.apiKey;
+        if (apiKey) {
+            headers[API_KEY_HEADER] = apiKey;
+        }
+        return headers;
+    }
+
+    /** Explains an unsuccessful response, naming the causes which have a specific remedy. */
+    static #describeResponse(response) {
+        if (response.status === 401) {
+            return `The table server rejected this client's API key. Set "Table API Key" in the ` +
+                `module settings to the secret the server was given as ZWTABLE_API_KEY.`;
+        }
+        return `Table server responded with ${response.status} ${response.statusText}.`;
+    }
+
+    /**
+     * Warns once at startup when the browser will not let this client reach the table at all.
+     * That refusal happens before any request is sent and is reported as a CORS error, so it
+     * is worth saying plainly rather than leaving a GM to conclude the table is broken.
+     */
+    static checkAddressSpace() {
+        const url = this.#buildUrl("/api/lights");
+        const diagnosis = url ? diagnoseAddressSpace(url) : null;
+        if (!diagnosis) {
+            return;
+        }
+        ZerowhaleTableLog.warn(diagnosis);
+        globalThis.ui?.notifications?.warn?.(
+            "Zerowhale table: this browser is not allowed to reach the table server. See the console.",
+            { permanent: true });
+    }
+
+    /**
+     * Describes a request that failed, saying why the browser refused it when that is knowable
+     * and blaming nothing when it is not.
+     */
+    static #unreachable(url, err) {
+        const message = `Could not reach the table server at ${url}.`;
+        const diagnosis = diagnoseAddressSpace(url);
+        return diagnosis ? [`${message} ${diagnosis}`, err] : [message, err];
     }
 
     /**

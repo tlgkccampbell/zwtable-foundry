@@ -66,6 +66,11 @@ Configure the module under *Game Settings → Configure Settings → Zerowhale T
 - **Table Enabled** — master switch for the integration.
 - **Table API Base URL** — e.g. `http://zwtable.local/`. **Only the GM's browser needs to be
   able to reach this address** (see below).
+- **Table API Key** — the shared secret, if the table server was given one (`ZWTABLE_API_KEY`).
+  Leave it empty if it was not. Unlike the other settings this one is stored per client rather
+  than in the world, so that it is not handed to every player who logs in; set it on each
+  machine you run the game from. See "Requiring a shared secret" in the table server's
+  `Documentation/deployment.md`.
 - **Player at Table Position 0–5** — which Foundry user sits at each light position.
 - **Idle Seat Brightness** — how brightly to light seats whose turn it is not, as a percentage.
   At 0 only the active combatant is lit, which is how the table behaved before this was added.
@@ -75,6 +80,40 @@ Configure the module under *Game Settings → Configure Settings → Zerowhale T
 - One switch per effect, so anything that turns out to be a distraction can be turned off.
   Targeting is off by default; it fires often enough at a busy table to be noise.
 - **Debug Logging** — per-client; logs every command and relay to the browser console.
+
+### Reaching the table from a hosted Foundry server
+
+Browsers only let a page talk to a device on the local network if the page is a *secure
+context* — served over `https://`, or loaded from the local network itself — and then only
+with the user's permission. A Foundry server reached over plain `http://` at a public address
+is not a secure context, so the GM's browser refuses to send anything to a table on the LAN,
+including over Tailscale, whose addresses count as local. It reports this as a CORS error:
+
+```
+Access to fetch at 'http://100.95.111.33/api/lights/execute/commands' from origin
+'http://203.0.113.10:30000' has been blocked by CORS policy: The request client is not a
+secure context and the resource is in more-private address space local.
+```
+
+That message is misleading. Nothing about the table server's CORS configuration is involved —
+the request is refused before it is sent, and no response header can permit it. The module
+says so explicitly in the console when it detects this, rather than reporting an outage.
+
+Only the GM's browser talks to the table, so only the GM's connection has to satisfy this.
+Players can carry on using the public address. In order of least effort:
+
+- **Open Foundry at an address on the table's own network.** If the Foundry server is on the
+  same LAN or tailnet as the table, the GM connects to it there — `http://192.168.1.20:30000`
+  or the table's tailnet address — instead of the public one. A page already on the local
+  network is not crossing into it, so nothing is blocked and no certificate is needed.
+- **Serve Foundry over `https://`.** With a real certificate the page becomes a secure context
+  and the browser will offer the GM a prompt to allow local network access. `tailscale serve`
+  will do this with a valid certificate and no further configuration; Foundry's own SSL
+  settings or a reverse proxy work too. A self-signed certificate is not enough.
+- **As a stopgap**, the GM's browser can be told to permit it for that one origin, through
+  enterprise policy or `chrome://flags/#block-insecure-private-network-requests`. These escape
+  hatches are being removed, so treat this as a way to finish tonight's session rather than a
+  fix.
 
 ### Which way round the strips are wired
 

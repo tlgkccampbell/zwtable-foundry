@@ -29,6 +29,10 @@ Hooks.once("ready", async function() {
     registerModuleApi();
 
     if (isResponsibleClient()) {
+        // Say so up front if the browser will not let this client reach the table, because
+        // every request after this point would fail for a reason that reads as a CORS error.
+        ZerowhaleTableApi.checkAddressSpace();
+
         // Strip lengths come from the table rather than being assumed, so effects which travel
         // around it stay correct if the hardware changes.
         await ZerowhaleTableGeometry.load();

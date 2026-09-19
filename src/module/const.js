@@ -47,6 +47,12 @@ export const COMMAND_ACTIONS = [
 /** The maximum number of commands accepted in a single relayed batch. */
 export const MAX_COMMANDS_PER_BATCH = 64;
 
+/**
+ * The header carrying the shared secret, for a table server which was given one. Matches
+ * ApiKeyMiddleware.ApiKeyHeaderName in the table server repository.
+ */
+export const API_KEY_HEADER = "X-Api-Key";
+
 /** How long to wait for the table server before giving up on a request, in milliseconds. */
 export const REQUEST_TIMEOUT_MS = 5000;
 
